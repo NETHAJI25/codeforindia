@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, AlertTriangle, Download, Share2, Shield,
   Activity, Target, ListChecks, Clock, User,
-  Hash, MapPin, Calendar,
+  Hash, MapPin, Calendar, FolderKanban,
 } from "lucide-react";
 import { cn, formatDateTime, riskColor, riskBgColor, severityColor } from "@/lib/utils";
 import { useData } from "@/lib/store";
@@ -62,12 +62,14 @@ const itemVariants = {
 
 export default function AISummaryPage() {
   const { cases, evidence, anomalies, timelineEvents } = useData();
-  const caseData = cases[0];
+  const [selectedCaseId, setSelectedCaseId] = useState(cases[0]?.id ?? "");
+  const caseData = cases.find(c => c.id === selectedCaseId);
   const [summary, setSummary] = useState<AISummary | null>(null);
   const [generating, setGenerating] = useState(false);
   const [phase, setPhase] = useState<"idle" | "analyzing" | "reveal">("idle");
 
   const handleGenerate = useCallback(() => {
+    if (!caseData) return;
     setGenerating(true);
     setPhase("analyzing");
     setTimeout(() => {
@@ -96,6 +98,22 @@ export default function AISummaryPage() {
           </div>
         </motion.div>
 
+        {/* Case Selector */}
+        <div className="flex items-center gap-3">
+          <FolderKanban className="w-4 h-4 text-cyan-400" />
+          <select
+            value={selectedCaseId}
+            onChange={(e) => { setSelectedCaseId(e.target.value); setPhase("idle"); setSummary(null); }}
+            className="px-4 py-2 rounded-xl bg-white/5 border border-cyan-500/20 text-white focus:outline-none focus:border-cyan-500/50 text-sm min-w-[200px]"
+          >
+            <option value="">Select a case...</option>
+            {cases.map((c) => (
+              <option key={c.id} value={c.id}>{c.id} — {c.title}</option>
+            ))}
+          </select>
+        </div>
+
+        {caseData && (
         <motion.div
           variants={containerVariants}
           initial="hidden"
@@ -155,6 +173,7 @@ export default function AISummaryPage() {
             )}
           </div>
         </motion.div>
+        )}
 
         {summary?.generatedAt && phase === "reveal" && (
           <motion.div
@@ -167,7 +186,7 @@ export default function AISummaryPage() {
           </motion.div>
         )}
 
-        {phase === "idle" && (
+        {phase === "idle" && caseData && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -186,6 +205,12 @@ export default function AISummaryPage() {
                 group-hover:animate-pulse" />
             </button>
           </motion.div>
+        )}
+
+        {phase === "idle" && !caseData && (
+          <div className="flex justify-center py-16 text-gray-500">
+            <p className="text-sm">Select a case above to generate an AI summary</p>
+          </div>
         )}
 
         <AnimatePresence>

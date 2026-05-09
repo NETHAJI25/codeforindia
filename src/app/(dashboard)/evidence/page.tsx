@@ -84,6 +84,9 @@ export default function EvidencePage() {
   const [dragOver, setDragOver] = useState(false);
   const [uploadQueue, setUploadQueue] = useState<File[]>([]);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [uploadCaseId, setUploadCaseId] = useState(cases[0]?.id ?? "");
+  const [viewEvidence, setViewEvidence] = useState<EvidenceItem | null>(null);
 
   const allTags = useMemo(() => Array.from(new Set(evidence.flatMap((e) => e.tags))), [evidence]);
   const allClassifications = useMemo(
@@ -142,11 +145,15 @@ export default function EvidencePage() {
 
   const handleUpload = () => {
     if (uploadQueue.length === 0) return;
-    const caseId = prompt("Enter Case ID for these files:", cases[0]?.id || "");
-    if (!caseId) return;
+    setUploadCaseId(cases[0]?.id ?? "");
+    setShowUploadDialog(true);
+  };
+
+  const confirmUpload = () => {
+    if (!uploadCaseId) return;
     for (const file of uploadQueue) {
       addEvidence({
-        caseId,
+        caseId: uploadCaseId,
         name: file.name,
         type: getEvidenceTypeFromFile(file),
         size: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
@@ -155,6 +162,7 @@ export default function EvidencePage() {
       });
     }
     setUploadQueue([]);
+    setShowUploadDialog(false);
   };
 
   const handleDelete = (id: string) => {
@@ -430,16 +438,22 @@ export default function EvidencePage() {
                     animate={{ opacity: 1 }}
                     className="absolute inset-0 rounded-xl bg-[#0B1020]/90 backdrop-blur-sm flex items-center justify-center gap-2"
                   >
-                    <button className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/30 text-xs font-medium transition-all">
+                    <button
+                      onClick={() => setViewEvidence(item)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/30 text-xs font-medium transition-all"
+                    >
                       <Eye className="w-3.5 h-3.5" />
                       View
                     </button>
-                    <button className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-500/20 border border-blue-500/40 text-blue-400 hover:bg-blue-500/30 text-xs font-medium transition-all">
+                    <button
+                      onClick={() => alert(`Downloading ${item.name}...\n\nFile download would start in a production environment.`)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-500/20 border border-blue-500/40 text-blue-400 hover:bg-blue-500/30 text-xs font-medium transition-all"
+                    >
                       <Download className="w-3.5 h-3.5" />
                       Download
                     </button>
                     <button
-                      onClick={() => router.push("/autopsy")}
+                      onClick={() => router.push(`/autopsy?caseId=${item.caseId}`)}
                       className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-400 hover:bg-purple-500/30 text-xs font-medium transition-all"
                     >
                       <BarChart3 className="w-3.5 h-3.5" />
@@ -466,6 +480,104 @@ export default function EvidencePage() {
           )}
         </motion.div>
       </div>
+
+      {/* Upload Dialog */}
+      <AnimatePresence>
+        {showUploadDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowUploadDialog(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-[#111827] border border-cyan-500/30 rounded-2xl p-6 w-full max-w-md shadow-2xl"
+            >
+              <h3 className="text-lg font-semibold text-white mb-4">Select Case for Upload</h3>
+              <p className="text-sm text-gray-400 mb-4">
+                {uploadQueue.length} file{uploadQueue.length !== 1 ? "s" : ""} will be uploaded to:
+              </p>
+              <select
+                value={uploadCaseId}
+                onChange={(e) => setUploadCaseId(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-cyan-500/20 text-white focus:outline-none focus:border-cyan-500/50 mb-4"
+              >
+                {cases.map((c) => (
+                  <option key={c.id} value={c.id}>{c.id} — {c.title}</option>
+                ))}
+              </select>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowUploadDialog(false)}
+                  className="flex-1 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 text-sm transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmUpload}
+                  className="flex-1 py-2 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/30 text-sm font-medium transition-all"
+                >
+                  Upload to Case
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* View Evidence Dialog */}
+      <AnimatePresence>
+        {viewEvidence && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={() => setViewEvidence(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-[#111827] border border-cyan-500/30 rounded-2xl p-6 w-full max-w-lg shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-white">{viewEvidence.name}</h3>
+                <button onClick={() => setViewEvidence(null)} className="text-gray-400 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between"><span className="text-gray-400">ID</span><span className="text-white font-mono">{viewEvidence.id}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Case</span><span className="text-white">{viewEvidence.caseId}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Type</span><span className="text-white">{viewEvidence.type}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Size</span><span className="text-white">{viewEvidence.size}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Custody</span><span className="text-white">{viewEvidence.custodyStatus}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Uploaded</span><span className="text-white">{formatDate(viewEvidence.uploadedAt)}</span></div>
+                {viewEvidence.aiClassification && (
+                  <div className="flex justify-between"><span className="text-gray-400">AI Classification</span><span className="text-purple-300">{viewEvidence.aiClassification}</span></div>
+                )}
+                {viewEvidence.tags.length > 0 && (
+                  <div className="flex justify-between items-start gap-2">
+                    <span className="text-gray-400 shrink-0">Tags</span>
+                    <div className="flex flex-wrap gap-1 justify-end">
+                      {viewEvidence.tags.map(t => (
+                        <span key={t} className="px-2 py-0.5 rounded text-[10px] bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">{t}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -34,9 +34,16 @@ export function generateAIAnalysis(evidence: EvidenceItem[], caseData?: Case): A
 
 export function generateTOD(bodyTemp: number, ambientTemp: number, humidity: number, rigor: string, livor: string): TODResult {
   const k = humidity < 60 ? 0.0015 : 0.0020;
-  const rawPmi = bodyTemp > ambientTemp
-    ? -Math.log((bodyTemp - ambientTemp) / (37 - ambientTemp + 0.01)) / k
-    : 18;
+  const tempDiff = bodyTemp - ambientTemp;
+
+  let rawPmi: number;
+  if (tempDiff > 1.5) {
+    rawPmi = -Math.log(tempDiff / (37 - ambientTemp + 0.01)) / k;
+  } else if (tempDiff > 0) {
+    rawPmi = 12 + (1 - tempDiff / 1.5) * 12;
+  } else {
+    rawPmi = 24 + Math.abs(tempDiff) * 1.5;
+  }
   const pmiHours = Math.max(1, Math.min(72, rawPmi));
 
   const rigorOffsets: Record<string, number> = { None: 0, Onset: 3, Full: 9, Passing: 24, Absent: 48 };
@@ -47,10 +54,21 @@ export function generateTOD(bodyTemp: number, ambientTemp: number, humidity: num
   const estimatedStart = new Date(now.getTime() - adjustedPmi * 3600000 * 1.2);
   const estimatedEnd = new Date(now.getTime() - adjustedPmi * 3600000 * 0.8);
 
+  const normalCoolingRate = (37 - ambientTemp) / 24;
   const coolingCurve = Array.from({ length: 25 }, (_, i) => ({
     hour: i,
-    temp: Math.max(ambientTemp, 37 - (i > 0 ? (i / 24) * (37 - ambientTemp) : 0) + (Math.random() - 0.5) * 0.5),
+    temp: Math.max(ambientTemp, 37 - i * normalCoolingRate + (Math.random() - 0.5) * 0.5),
   }));
+
+  const henssgeCurve = Array.from({ length: 25 }, (_, i) => {
+    const t = i;
+    const theoBody = ambientTemp + (37 - ambientTemp) * Math.exp(-k * t * 3600);
+    return { hour: t, temp: Math.round(theoBody * 10) / 10 };
+  });
+
+  const tempEffect = ambientTemp > 30
+    ? `Warm ambient (${ambientTemp}°C) accelerates cooling, PMI estimate adjusted +${Math.round(Math.abs(ambientTemp - 25) * 2)}%`
+    : `Cool ambient (${ambientTemp}°C) slows cooling, PMI estimate adjusted -${Math.round(Math.abs(ambientTemp - 25) * 2)}%`;
 
   return {
     estimatedRange: {
@@ -61,9 +79,9 @@ export function generateTOD(bodyTemp: number, ambientTemp: number, humidity: num
     confidence: Math.min(95, Math.round(50 + adjustedPmi * 0.8 + (rigor !== "None" ? 10 : 0) + (livor !== "None" ? 10 : 0))),
     method: "Henssge Nomogram + Rigor/Livor adjustment + Environmental correction",
     coolingCurve,
-    henssgeCurve: Array.from({ length: 25 }, (_, i) => ({ hour: i, temp: Math.max(ambientTemp, 37 - i * (37 - ambientTemp) / 24 - 0.5) })),
+    henssgeCurve,
     effects: [
-      { factor: "Ambient Temperature", description: `${ambientTemp}°C — ${ambientTemp > 30 ? "Accelerates" : "Slows"} cooling rate by approximately ${Math.abs(ambientTemp - 25) * 2}%` },
+      { factor: "Ambient Temperature", description: tempEffect },
       { factor: "Humidity", description: `${humidity}% — ${humidity > 70 ? "Slows lividity development" : "Normal lividity progression"}` },
       { factor: "Rigor Mortis", description: `Stage: ${rigor} — ${rigor === "None" ? "Early PMI indicated" : rigor === "Passing" ? "PMI likely > 24 hours" : "PMI consistent with rigor presence"}` },
     ],

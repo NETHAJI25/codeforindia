@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { Suspense, useState, useMemo, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Microscope, AlertTriangle, CheckCircle, FileText,
-  Search, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
+  Search, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, FolderKanban,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useData } from "@/lib/store";
@@ -184,7 +185,8 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 },
 };
 
-export default function AutopsyPage() {
+function AutopsyPageInner() {
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [analyzed, setAnalyzed] = useState(false);
@@ -193,10 +195,21 @@ export default function AutopsyPage() {
   const [rawOpen, setRawOpen] = useState(false);
   const [result, setResult] = useState<AIAnalysisResult | null>(null);
   const [flagged, setFlagged] = useState(false);
+  const [selectedCaseId, setSelectedCaseId] = useState("");
 
   const { cases, evidence, addTimelineEvent } = useData();
 
+  useEffect(() => {
+    const caseId = searchParams.get("caseId");
+    if (caseId && cases.find(c => c.id === caseId)) {
+      setSelectedCaseId(caseId);
+    }
+  }, [searchParams, cases]);
+
+  const selectedCase = cases.find(c => c.id === selectedCaseId);
+
   const startAnalysis = useCallback(() => {
+    if (!selectedCase) return;
     setScanning(true);
     setProgress(0);
     const interval = setInterval(() => {
@@ -205,7 +218,7 @@ export default function AutopsyPage() {
         if (next >= 100) {
           clearInterval(interval);
           setTimeout(() => {
-            const analysis = generateAIAnalysis(evidence, cases[0]);
+            const analysis = generateAIAnalysis(evidence, selectedCase);
             setResult(analysis);
             setScanning(false);
             setAnalyzed(true);
@@ -215,7 +228,7 @@ export default function AutopsyPage() {
         return next;
       });
     }, 200);
-  }, [evidence, cases]);
+  }, [evidence, selectedCase]);
 
   const reportContent = useMemo(() => {
     const text = MOCK_REPORT_PAGES[page] ?? "";
@@ -229,21 +242,44 @@ export default function AutopsyPage() {
         <p className="text-sm text-gray-400 mt-1">AI-powered forensic report intelligence extraction</p>
       </motion.div>
 
+      {/* Case Selector */}
+      <div className="flex items-center gap-3">
+        <FolderKanban className="w-4 h-4 text-cyan-400" />
+        <select
+          value={selectedCaseId}
+          onChange={(e) => { setSelectedCaseId(e.target.value); setAnalyzed(false); setResult(null); }}
+          className="px-4 py-2 rounded-xl bg-white/5 border border-cyan-500/20 text-white focus:outline-none focus:border-cyan-500/50 text-sm min-w-[200px]"
+        >
+          <option value="">Select a case...</option>
+          {cases.map((c) => (
+            <option key={c.id} value={c.id}>{c.id} — {c.title}</option>
+          ))}
+        </select>
+        {selectedCase && (
+          <span className="text-xs text-gray-400">
+            Victim: {selectedCase.victim} | Officer: {selectedCase.officer}
+          </span>
+        )}
+      </div>
+
       {!analyzed && !scanning && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-center py-16">
           <button
             onClick={startAnalysis}
-            className="group relative px-8 py-4 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 font-semibold text-lg hover:bg-cyan-500/30 transition-all overflow-hidden"
+            disabled={!selectedCase}
+            className="group relative px-8 py-4 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 font-semibold text-lg hover:bg-cyan-500/30 transition-all overflow-hidden disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <span className="relative z-10 flex items-center gap-3">
               <Microscope className="w-6 h-6" />
-              Analyze Report
+              {selectedCase ? "Analyze Report" : "Select a case first"}
             </span>
-            <motion.div
-              className="absolute inset-0 bg-cyan-500/10"
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-            />
+            {selectedCase && (
+              <motion.div
+                className="absolute inset-0 bg-cyan-500/10"
+                animate={{ scale: [1, 1.05, 1] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              />
+            )}
           </button>
         </motion.div>
       )}
@@ -288,7 +324,7 @@ export default function AutopsyPage() {
                   <FileText className="w-4 h-4 text-cyan-400" />
                   <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Original Report</h2>
                 </div>
-                <span className="text-[10px] text-gray-500 font-mono">Case CI-2025-014</span>
+                <span className="text-[10px] text-gray-500 font-mono">Case {selectedCase?.id || "N/A"}</span>
               </div>
 
               {/* Search */}
@@ -403,9 +439,9 @@ export default function AutopsyPage() {
                 </button>
                 <button
                   onClick={() => {
-                    if (!cases[0] || !result) return;
+                    if (!selectedCase || !result) return;
                     addTimelineEvent({
-                      caseId: cases[0].id,
+                      caseId: selectedCase.id,
                       timestamp: new Date().toISOString(),
                       type: "Evidence Upload",
                       title: "Autopsy Analysis Completed",
@@ -461,5 +497,13 @@ export default function AutopsyPage() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+export default function AutopsyPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 rounded-full border-2 border-cyan-500/30 border-t-cyan-400 animate-spin" /></div>}>
+      <AutopsyPageInner />
+    </Suspense>
   );
 }
