@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AIVENTRA — AI-Powered Forensic Triage & Postmortem Intelligence System
+
+AIVENTRA is an AI-powered forensic intelligence ecosystem designed to help investigators, forensic analysts, police departments, cybercrime teams, and medical officers process huge amounts of evidence faster and more intelligently.
+
+---
+
+## Tech Stack
+
+- **Frontend:** Next.js 16, React 19, TypeScript, Tailwind CSS v4
+- **Visualization:** Framer Motion, Recharts, Leaflet, @xyflow/react
+- **Real-time:** Custom MockWebSocket (Socket.IO compatible)
+- **Backend:** FastAPI (Python 3.12), JWT Auth, Uvicorn
+- **Icons:** Lucide React
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd aiventra
+
+# Frontend (production)
+npx next build && npx next start --port 3001
+
+# Backend (separate terminal)
+cd backend/src
+pip install -r requirements.txt
+python main.py
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3001](http://localhost:3001) to see the login page.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 16 Pages
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Page | Route | Description |
+|------|-------|-------------|
+| Login | `/login` | Auth with validation |
+| Register | `/register` | User registration |
+| Forgot Password | `/forgot-password` | Password reset |
+| Dashboard | `/dashboard` | Command center with live data |
+| Cases | `/cases` | Case list with filters |
+| Create Case | `/cases/new` | New case form |
+| Evidence | `/evidence` | Upload & manage evidence |
+| Autopsy | `/autopsy` | AI report analysis |
+| TOD | `/tod` | Time-of-death estimation |
+| Timeline | `/timeline` | Interactive investigation timeline |
+| Correlation | `/correlation` | Evidence node graph |
+| Crime Map | `/crime-map` | Leaflet crime scene map |
+| Sensors | `/sensors` | Live IoT sensor monitoring |
+| Custody | `/custody` | Chain of custody tracker |
+| Anomalies | `/anomalies` | Anomaly detection center |
+| AI Summary | `/ai-summary` | AI-generated case summary |
+| Chat | `/chat` | AI chat assistant |
+| Notifications | `/notifications` | Notification center |
+| Reports | `/reports` | Report generator & export |
+
+## API Endpoints (FastAPI)
+
+Base URL: `http://localhost:8001`
+
+- `POST /api/auth/login` — JWT authentication
+- `GET/POST /api/cases` — List/create cases
+- `GET/POST /api/evidence` — Manage evidence
+- `POST /api/sensors/ingest` — ESP32 data ingestion
+- `POST /api/ai/analyze-report` — NLP forensic extraction
+- `POST /api/ai/estimate-tod` — Henssge calculation
+- `POST /api/ai/generate-summary` — AI summary
+- `POST /api/ai/detect-anomalies` — Anomaly detection
+- `GET /api/timeline` — Timeline events
 
 ## Learn More
 
-To learn more about Next.js, take a look at the following resources:
+- [Next.js Documentation](https://nextjs.org/docs)
+- [FastAPI Documentation](https://fastapi.tiangolo.com/)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+*AIVENTRA — Intelligence that investigates.*
