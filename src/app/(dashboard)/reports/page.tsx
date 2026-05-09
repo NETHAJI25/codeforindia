@@ -62,13 +62,35 @@ interface RecentExport {
   status: "Generated" | "Pending" | "Error";
 }
 
-const recentExports: RecentExport[] = [
-  { name: "CI-2025-014_Full_Case_Report.pdf", type: "Full Case", generatedBy: "Inspector Priya Sharma", date: "2025-01-15T10:30:00Z", status: "Generated" },
-  { name: "CI-2025-014_Timeline_Report.pdf", type: "Timeline", generatedBy: "Dr. Arjun Mehta", date: "2025-01-15T09:00:00Z", status: "Generated" },
-  { name: "CI-2025-013_Anomaly_Report.pdf", type: "Anomaly", generatedBy: "Inspector Vikram Joshi", date: "2025-01-14T14:20:00Z", status: "Generated" },
-  { name: "CI-2025-009_Evidence_Summary.pdf", type: "Evidence Summary", generatedBy: "Tech. Ravi Verma", date: "2025-01-13T11:45:00Z", status: "Pending" },
-  { name: "CI-2025-012_Audit_Trail.pdf", type: "Audit Trail", generatedBy: "Inspector Priya Sharma", date: "2025-01-12T16:00:00Z", status: "Error" },
-];
+function useRecentExports(): RecentExport[] {
+  const { cases, anomalies } = useData();
+  return useMemo(() => {
+    const exports: RecentExport[] = [];
+    const reportTypes = ["Full Case", "Timeline", "Anomaly", "Evidence Summary", "Audit Trail"];
+    const statuses: ("Generated" | "Pending" | "Error")[] = ["Generated", "Pending", "Error"];
+    const names = ["Dr. Arjun Mehta", "Inspector Vikram Joshi", "Tech. Ravi Verma", "Inspector Priya Sharma"];
+    cases.forEach((c, i) => {
+      const type = reportTypes[i % reportTypes.length];
+      exports.push({
+        name: `${c.id}_${type.replace(/\s+/g, "_")}_Report.pdf`,
+        type,
+        generatedBy: names[i % names.length],
+        date: new Date(Date.now() - i * 86400000).toISOString(),
+        status: statuses[i % statuses.length],
+      });
+    });
+    if (anomalies.length > 0) {
+      exports.push({
+        name: `ANOMALY_ALERT_${new Date().toISOString().slice(0, 10)}.pdf`,
+        type: "Anomaly",
+        generatedBy: "AI System",
+        date: new Date().toISOString(),
+        status: "Generated",
+      });
+    }
+    return exports.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [cases, anomalies]);
+}
 
 const statusColor: Record<string, string> = {
   Generated: "bg-green-500/15 text-green-400 border-green-500/30",
@@ -182,6 +204,7 @@ function GeneratedPreview({
 
 export default function ReportsPage() {
   const { cases, evidence, anomalies } = useData();
+  const recentExports = useRecentExports();
   const [selectedReport, setSelectedReport] = useState<string>("full-case");
   const [selectedCase, setSelectedCase] = useState(cases[0]?.id ?? "");
   const [dateFrom, setDateFrom] = useState("");

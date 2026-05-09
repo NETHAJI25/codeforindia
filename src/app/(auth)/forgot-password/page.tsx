@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
 import { Loader2, Shield, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth";
 
 const forgotSchema = z.object({
   email: z.string().email("Enter a valid email address"),
@@ -16,6 +17,7 @@ const forgotSchema = z.object({
 type ForgotForm = z.infer<typeof forgotSchema>;
 
 export default function ForgotPasswordPage() {
+  const { forgotPassword } = useAuth();
   const [sent, setSent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -30,8 +32,7 @@ export default function ForgotPasswordPage() {
 
   async function onSubmit(data: ForgotForm) {
     setIsLoading(true);
-    console.log("Reset password for:", data.email);
-    await new Promise((r) => setTimeout(r, 1500));
+    await forgotPassword(data.email);
     setIsLoading(false);
     setSent(true);
   }

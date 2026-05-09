@@ -9,6 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, Loader2, Shield, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth";
 
 const roles = ["Investigator", "Forensic Analyst", "Medical Officer", "Admin"] as const;
 
@@ -38,6 +39,7 @@ const roleAccents: Record<string, string> = {
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { register: authRegister } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -66,8 +68,13 @@ export default function RegisterPage() {
 
   async function onSubmit(data: RegisterForm) {
     setIsLoading(true);
-    console.log("Register attempt:", data);
-    await new Promise((r) => setTimeout(r, 1800));
+    await authRegister({
+      name: data.fullName,
+      email: data.email,
+      password: data.password,
+      role: data.role,
+      badgeId: data.badgeId,
+    });
     setIsLoading(false);
     setSuccess(true);
     setTimeout(() => router.push("/login"), 1200);

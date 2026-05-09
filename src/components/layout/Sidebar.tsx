@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth";
 import {
   LayoutDashboard, FolderKanban, Upload, Microscope, Clock, CalendarDays,
   Share2, Map, Radio, ShieldCheck, AlertTriangle, Bot, MessageSquare,
@@ -28,6 +29,7 @@ const navItems = [
 
 export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const pathname = usePathname();
+  const { user, logout } = useAuth();
   return (
     <aside className={cn(
       "fixed left-0 top-0 h-full z-50 flex flex-col bg-[#0B1020]/95 backdrop-blur border-r border-cyan-500/10 transition-all duration-300",
@@ -78,17 +80,17 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
               <User className="w-4 h-4 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-white truncate">Priya Sharma</p>
-              <p className="text-xs text-cyan-400">Investigator</p>
+              <p className="text-sm text-white truncate">{user?.name ?? "Guest"}</p>
+              <p className="text-xs text-cyan-400">{user?.role ?? "—"}</p>
             </div>
-            <LogOut className="w-4 h-4 text-gray-500 hover:text-red-400 cursor-pointer" />
+            <LogOut onClick={logout} className="w-4 h-4 text-gray-500 hover:text-red-400 cursor-pointer" />
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
               <User className="w-4 h-4 text-white" />
             </div>
-            <LogOut className="w-4 h-4 text-gray-500 hover:text-red-400 cursor-pointer" />
+            <LogOut onClick={logout} className="w-4 h-4 text-gray-500 hover:text-red-400 cursor-pointer" />
           </div>
         )}
       </div>

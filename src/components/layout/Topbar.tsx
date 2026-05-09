@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn, riskColor, riskBgColor } from "@/lib/utils";
 import { getSocket } from "@/lib/socket";
 import { useData } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
 import { Bell, ChevronDown, Circle, User } from "lucide-react";
 
 const breadcrumbLabels: Record<string, string> = {
@@ -28,6 +29,7 @@ const breadcrumbLabels: Record<string, string> = {
 export default function Topbar() {
   const pathname = usePathname();
   const { cases, notifications } = useData();
+  const { user } = useAuth();
   const [connected, setConnected] = useState(false);
   const [caseSelectorOpen, setCaseSelectorOpen] = useState(false);
   const [selectedCaseId, setSelectedCaseId] = useState(cases[0]?.id ?? "");
@@ -130,15 +132,15 @@ export default function Topbar() {
           </div>
         )}
 
-        <div className="flex items-center gap-2 pl-3 border-l border-white/10">
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
-            <User className="w-3.5 h-3.5 text-white" />
+          <div className="flex items-center gap-2 pl-3 border-l border-white/10">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
+              <User className="w-3.5 h-3.5 text-white" />
+            </div>
+            <div className="hidden sm:block">
+              <p className="text-sm text-white leading-tight">{user?.name ?? "Guest"}</p>
+              <p className="text-[10px] text-cyan-400 leading-tight">{user?.role ?? "—"}</p>
+            </div>
           </div>
-          <div className="hidden sm:block">
-            <p className="text-sm text-white leading-tight">Priya Sharma</p>
-            <p className="text-[10px] text-cyan-400 leading-tight">Investigator</p>
-          </div>
-        </div>
       </div>
     </header>
   );

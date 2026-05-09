@@ -9,6 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
 import { Fingerprint, Eye, EyeOff, Loader2, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth";
 
 const loginSchema = z.object({
   email: z.string().email("Enter a valid email address"),
@@ -20,6 +21,7 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -34,8 +36,7 @@ export default function LoginPage() {
 
   async function onSubmit(data: LoginForm) {
     setIsLoading(true);
-    console.log("Login attempt:", data);
-    await new Promise((r) => setTimeout(r, 1800));
+    await login(data.email, data.password);
     setIsLoading(false);
     router.push("/dashboard");
   }
