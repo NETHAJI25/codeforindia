@@ -8,7 +8,8 @@ import {
   Activity, Shield, AlertTriangle, X,
 } from "lucide-react";
 import { cn, formatDateTime, riskColor } from "@/lib/utils";
-import { mockCases, mockChatMessages } from "@/lib/mock-data";
+import { useData } from "@/lib/store";
+import { generateChatResponse } from "@/lib/dynamic-data";
 import type { ChatMessage } from "@/types";
 
 function ThinkingDots() {
@@ -132,71 +133,11 @@ function TypewriterText({ text, speed = 20 }: { text: string; speed?: number }) 
   return <>{formatAIResponse(text.slice(0, displayed))}</>;
 }
 
-function getAIResponse(userMessage: string): string {
-  const msg = userMessage.toLowerCase();
-  if (msg.includes("evidence") || msg.includes("suspicious")) {
-    return mockChatMessages[2].content;
-  }
-  if (msg.includes("tod") || msg.includes("time of death") || msg.includes("death")) {
-    return mockChatMessages[4].content;
-  }
-  if (msg.includes("summary") || msg.includes("case")) {
-    return `**Case Summary — CI-2025-014**
 
-**Victim:** Rajesh Kumar (34, Male)
-**Incident:** Homicide — Industrial District
-**Date:** 14 January 2025
-**Status:** Active Investigation
-**Priority:** Critical
-**Risk Score:** 82/100
-
-**Assigned Team:**
-- Lead: Inspector Priya Sharma
-- Analyst: Dr. Arjun Mehta
-- Medical Officer: Dr. Kavita Singh
-
-**Evidence Count:** 12 items
-**Anomalies Detected:** 7
-**Key Anomalies:**
-1. Evidence E-001 timestamp mismatch (Confidence: 94%)
-2. GPS data shows impossible speed (Confidence: 87%)
-3. Photo EXIF inconsistent with device (Confidence: 91%)
-
-**Current Focus:** Investigators are prioritizing the timestamp manipulation on the autopsy report and identifying the white SUV suspects.`;
-  }
-  if (msg.includes("e-007")) {
-    return `**Access Log for Evidence E-007 — Toxicology Report.pdf**
-
-**Current Custody:** In Lab (Medical Examiner Office)
-**Chain of Custody:**
-1. Collected by Dr. Kavita Singh at Crime Scene — 03 Jan 2025, 08:00
-2. Transferred to Forensic Lab — 03 Jan 2025, 14:30
-3. Signed out for analysis — 04 Jan 2025, 09:15
-4. Currently in Lab for toxicology screening
-
-**Authorized Personnel:**
-- Dr. Kavita Singh (Medical Officer)
-- Dr. Arjun Mehta (Forensic Analyst)
-- Inspector Priya Sharma (Lead Investigator)
-
-⚠️ No unauthorized access detected. Chain of custody is intact.`;
-  }
-  return `I've analyzed the available data for Case CI-2025-014. Here's what I found:
-
-**Current Case Status:** Active Investigation — Critical Priority
-
-The evidence corpus contains **12 items** with **7 flagged anomalies**. The most significant finding is a **timestamp mismatch** on the autopsy report (E-001) with 94% confidence. 
-
-**Recommendations:**
-1. Prioritize investigation of evidence E-001 timestamp manipulation
-2. Cross-reference GPS data with CCTV timeline
-3. Review chain of custody for all evidence items
-
-Would you like me to analyze any specific evidence item or generate a detailed report on any particular aspect of this case?`;
-}
 
 export default function ChatPage() {
-  const caseData = mockCases[0];
+  const { chatMessages, cases, evidence, anomalies, timelineEvents, addChatMessage } = useData();
+  const caseData = cases[0];
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
@@ -210,11 +151,11 @@ export default function ChatPage() {
       {
         id: "welcome",
         role: "assistant",
-        content: mockChatMessages[0].content,
+        content: chatMessages[0]?.content ?? "Welcome to AIVENTRA AI. I'm your investigative assistant. How can I help you today?",
         timestamp: new Date().toISOString(),
       },
     ]);
-  }, []);
+  }, [chatMessages]);
 
   useEffect(() => {
     addWelcomeMessage();
@@ -227,10 +168,11 @@ export default function ChatPage() {
   const handleSend = useCallback((text: string) => {
     if (!text.trim() || thinking) return;
 
+    const trimmed = text.trim();
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: "user",
-      content: text.trim(),
+      content: trimmed,
       timestamp: new Date().toISOString(),
     };
 
@@ -238,8 +180,10 @@ export default function ChatPage() {
     setInput("");
     setThinking(true);
 
+    addChatMessage({ role: "user", content: trimmed });
+
     setTimeout(() => {
-      const aiContent = getAIResponse(text.trim());
+      const aiContent = generateChatResponse(trimmed, cases, evidence, anomalies, timelineEvents);
       const aiId = `ai-${Date.now()}`;
       const aiMsg: ChatMessage = {
         id: aiId,
@@ -251,6 +195,8 @@ export default function ChatPage() {
       setThinking(false);
       setStreamingId(aiId);
 
+      addChatMessage({ role: "assistant", content: aiContent });
+
       const totalLength = aiContent.length;
       let revealed = 0;
       const interval = setInterval(() => {
@@ -261,7 +207,7 @@ export default function ChatPage() {
         }
       }, 25);
     }, 1500 + Math.random() * 1000);
-  }, [thinking]);
+  }, [thinking, cases, evidence, anomalies, timelineEvents, addChatMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {

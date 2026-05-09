@@ -8,7 +8,7 @@ import {
   Search, Filter, ChevronDown,
 } from "lucide-react";
 import { cn, timeAgo, severityColor } from "@/lib/utils";
-import { mockAnomalies } from "@/lib/mock-data";
+import { useData } from "@/lib/store";
 import type { Anomaly, AnomalySeverity, AnomalyType } from "@/types";
 
 const typeIconMap: Record<AnomalyType, React.ElementType> = {
@@ -316,12 +316,12 @@ function DetectionTimeline({ anomalies }: { anomalies: Anomaly[] }) {
 }
 
 export default function AnomaliesPage() {
+  const { anomalies, updateAnomaly, deleteAnomaly, addAnomaly } = useData();
   const [selectedSeverities, setSelectedSeverities] = useState<AnomalySeverity[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<AnomalyType[]>([]);
   const [showUnresolved, setShowUnresolved] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [resolvingAnomaly, setResolvingAnomaly] = useState<Anomaly | null>(null);
-  const [anomalies, setAnomalies] = useState(mockAnomalies);
   const [flaggedIds, setFlaggedIds] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
 
@@ -352,18 +352,14 @@ export default function AnomaliesPage() {
   }, [anomalies, selectedSeverities, selectedTypes, showUnresolved, searchQuery]);
 
   const handleResolve = (id: string, resolution: string, comment: string) => {
-    setAnomalies((prev) =>
-      prev.map((a) =>
-        a.id === id ? { ...a, status: resolution as Anomaly["status"] } : a,
-      ),
-    );
+    updateAnomaly(id, { status: resolution as Anomaly["status"] });
   };
 
   const handleFlag = (anomaly: Anomaly) => {
+    updateAnomaly(anomaly.id, { status: "Under Investigation" });
     setFlaggedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(anomaly.id)) next.delete(anomaly.id);
-      else next.add(anomaly.id);
+      next.add(anomaly.id);
       return next;
     });
   };

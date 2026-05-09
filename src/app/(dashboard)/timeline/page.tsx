@@ -8,7 +8,7 @@ import {
   Clock, Filter, ChevronDown,
 } from "lucide-react";
 import { cn, formatTime, formatDate } from "@/lib/utils";
-import { mockTimelineEvents, mockCases } from "@/lib/mock-data";
+import { useData } from "@/lib/store";
 import type { TimelineEvent } from "@/types";
 
 const eventTypes = [
@@ -48,10 +48,12 @@ function EventCard({
   event,
   isActive,
   index,
+  onDelete,
 }: {
   event: TimelineEvent;
   isActive: boolean;
   index: number;
+  onDelete?: (id: string) => void;
 }) {
   const cfg = typeConfig[event.type] ?? typeConfig["CCTV"];
   const Icon = cfg.icon;
@@ -99,6 +101,15 @@ function EventCard({
             {event.type}
           </span>
           <h3 className="text-sm font-semibold text-white">{event.title}</h3>
+          {onDelete && (
+            <button
+              onClick={() => onDelete(event.id)}
+              className="ml-auto text-gray-500 hover:text-red-400 transition-colors p-1"
+              title="Delete event"
+            >
+              <span className="text-xs font-bold">&times;</span>
+            </button>
+          )}
         </div>
         <p className="text-xs text-gray-400 leading-relaxed">{event.description}</p>
 
@@ -132,6 +143,8 @@ function EventCard({
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 export default function TimelinePage() {
+  const { timelineEvents, deleteTimelineEvent, cases } = useData();
+
   /* ----- state ----- */
   const [selectedCase, setSelectedCase] = useState("");
   const [activeTypes, setActiveTypes] = useState<Set<string>>(new Set(eventTypes));
@@ -143,19 +156,19 @@ export default function TimelinePage() {
 
   /* ----- derived data ----- */
   const filtered = useMemo(() => {
-    let list = [...mockTimelineEvents];
+    let list = [...timelineEvents];
     if (selectedCase) list = list.filter((e) => e.caseId === selectedCase);
     if (!activeTypes.has("All")) {
       list = list.filter((e) => activeTypes.has(e.type));
     }
     list.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     return list;
-  }, [selectedCase, activeTypes]);
+  }, [selectedCase, activeTypes, timelineEvents]);
 
   const caseOptions = useMemo(() => {
-    const ids = new Set(mockTimelineEvents.map((e) => e.caseId));
-    return mockCases.filter((c) => ids.has(c.id));
-  }, []);
+    const ids = new Set(timelineEvents.map((e) => e.caseId));
+    return cases.filter((c) => ids.has(c.id));
+  }, [timelineEvents, cases]);
 
   /* ----- filter toggle ----- */
   const toggleType = useCallback((type: string) => {
@@ -424,6 +437,7 @@ export default function TimelinePage() {
               event={event}
               index={i}
               isActive={isPlaying && i === playIndex}
+              onDelete={deleteTimelineEvent}
             />
           ))}
         </div>

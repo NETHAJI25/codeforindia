@@ -18,7 +18,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { cn, timeAgo } from "@/lib/utils";
-import { mockNotifications } from "@/lib/mock-data";
+import { useData } from "@/lib/store";
 import { getSocket } from "@/lib/socket";
 import type { Notification, NotificationType } from "@/types";
 
@@ -90,7 +90,7 @@ function ToastNotification({
 }
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
+  const { notifications, markNotificationRead, markAllNotificationsRead, deleteNotification, dispatch } = useData();
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [toasts, setToasts] = useState<Notification[]>([]);
   const [smsCritical, setSmsCritical] = useState(true);
@@ -110,16 +110,12 @@ export default function NotificationsPage() {
   }, [notifications, activeTab]);
 
   const markAllRead = useCallback(() => {
-    setNotifications((prev) =>
-      prev.map((n) => ({ ...n, read: true }))
-    );
-  }, []);
+    markAllNotificationsRead();
+  }, [markAllNotificationsRead]);
 
   const dismissNotification = useCallback((id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
-  }, []);
+    deleteNotification(id);
+  }, [deleteNotification]);
 
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -132,7 +128,7 @@ export default function NotificationsPage() {
     const handler = (data: unknown) => {
       const notif = data as Notification;
       if (!notif.id) return;
-      setNotifications((prev) => [notif, ...prev]);
+      dispatch({ type: "ADD_NOTIFICATION", payload: notif });
       if (notif.severity === "critical") {
         const id = `toast-${++toastId.current}`;
         setToasts((prev) => [...prev, { ...notif, id }]);
@@ -212,7 +208,8 @@ export default function NotificationsPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10, scale: 0.98 }}
                   transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  className="relative glass rounded-2xl overflow-hidden hover:border-cyan-500/30 transition-colors"
+                  onClick={() => markNotificationRead(notif.id)}
+                  className="relative glass rounded-2xl overflow-hidden hover:border-cyan-500/30 transition-colors cursor-pointer"
                 >
                   <div className="flex">
                     <div className={cn("w-1 shrink-0", severityBarColor[sev] ?? "bg-gray-500")} />
@@ -262,7 +259,7 @@ export default function NotificationsPage() {
                               </button>
                             )}
                             <button
-                              onClick={() => dismissNotification(notif.id)}
+                              onClick={(e) => { e.stopPropagation(); dismissNotification(notif.id); }}
                               className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10 text-[10px] font-medium transition-all"
                             >
                               <CheckCircle2 className="w-3 h-3" />

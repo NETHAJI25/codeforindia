@@ -9,8 +9,8 @@ import {
   FileDigit, Search, UserCheck, UserX,
 } from "lucide-react";
 import { cn, formatDate, formatTime, timeAgo } from "@/lib/utils";
-import { mockEvidence, mockCustodyRecords } from "@/lib/mock-data";
-import type { EvidenceItem, CustodyRecord, EvidenceType, CustodyStatus } from "@/types";
+import { useData } from "@/lib/store";
+import type { EvidenceItem, CustodyRecord, EvidenceType, CustodyStatus, Role } from "@/types";
 
 const typeIcon: Record<EvidenceType, React.ElementType> = {
   PDF: FileText,
@@ -232,17 +232,41 @@ function AlertCard({ icon: Icon, title, description, color }: {
 }
 
 export default function CustodyPage() {
-  const [selectedId, setSelectedId] = useState<string>(mockEvidence[0]?.id ?? "");
+  const { evidence, custodyRecords: allCustodyRecords, addCustodyRecord } = useData();
+  const [selectedId, setSelectedId] = useState<string>(evidence[0]?.id ?? "");
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [formPerson, setFormPerson] = useState("");
+  const [formAction, setFormAction] = useState("");
+  const [formLocation, setFormLocation] = useState("");
+  const [formRole, setFormRole] = useState<Role>("Investigator");
 
   const selectedEvidence = useMemo(
-    () => mockEvidence.find((e) => e.id === selectedId),
-    [selectedId],
+    () => evidence.find((e) => e.id === selectedId),
+    [selectedId, evidence],
   );
 
   const custodyRecords = useMemo(
-    () => mockCustodyRecords.filter((r) => r.evidenceId === selectedId),
-    [selectedId],
+    () => allCustodyRecords.filter((r) => r.evidenceId === selectedId),
+    [selectedId, allCustodyRecords],
   );
+
+  const handleAddRecord = () => {
+    if (!formPerson.trim() || !formAction.trim() || !formLocation.trim()) return;
+    addCustodyRecord({
+      evidenceId: selectedId,
+      action: formAction.trim(),
+      person: formPerson.trim(),
+      role: formRole,
+      location: formLocation.trim(),
+      timestamp: new Date().toISOString(),
+      verified: true,
+    });
+    setFormPerson("");
+    setFormAction("");
+    setFormLocation("");
+    setFormRole("Investigator");
+    setShowAddForm(false);
+  };
 
   const suspiciousAlerts = useMemo(() => {
     const alerts: { icon: React.ElementType; title: string; description: string; color: string }[] = [];
@@ -267,12 +291,12 @@ export default function CustodyPage() {
   }, [selectedId, custodyRecords]);
 
   const evidenceStats = useMemo(() => ({
-    total: mockEvidence.length,
-    secured: mockEvidence.filter((e) => e.custodyStatus === "Secured").length,
-    inLab: mockEvidence.filter((e) => e.custodyStatus === "In Lab").length,
-    inTransit: mockEvidence.filter((e) => e.custodyStatus === "In Transit").length,
-    compromised: mockEvidence.filter((e) => e.custodyStatus === "Compromised").length,
-  }), []);
+    total: evidence.length,
+    secured: evidence.filter((e) => e.custodyStatus === "Secured").length,
+    inLab: evidence.filter((e) => e.custodyStatus === "In Lab").length,
+    inTransit: evidence.filter((e) => e.custodyStatus === "In Transit").length,
+    compromised: evidence.filter((e) => e.custodyStatus === "Compromised").length,
+  }), [evidence]);
 
   return (
     <div className="relative min-h-screen p-4 md:p-6 space-y-6 animate-grid-bg">
@@ -328,12 +352,12 @@ export default function CustodyPage() {
               animate="visible"
               className="space-y-2 max-h-[600px] overflow-y-auto pr-1"
             >
-              {mockEvidence.map((evidence) => (
+              {evidence.map((item) => (
                 <EvidenceCard
-                  key={evidence.id}
-                  evidence={evidence}
-                  selected={evidence.id === selectedId}
-                  onClick={() => setSelectedId(evidence.id)}
+                  key={item.id}
+                  evidence={item}
+                  selected={item.id === selectedId}
+                  onClick={() => setSelectedId(item.id)}
                 />
               ))}
             </motion.div>
@@ -349,23 +373,96 @@ export default function CustodyPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="backdrop-blur-md bg-white/5 border border-cyan-500/20 rounded-2xl p-4 md:p-6"
               >
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
-                      Chain of Custody
-                    </h2>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {selectedEvidence.name} &middot; {selectedEvidence.id}
-                    </p>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
+                        Chain of Custody
+                      </h2>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {selectedEvidence.name} &middot; {selectedEvidence.id}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setShowAddForm(!showAddForm)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium
+                          bg-cyan-500/10 text-cyan-400 border border-cyan-500/20
+                          hover:bg-cyan-500/20 transition-colors"
+                      >
+                        Add Record
+                      </button>
+                      <span className={cn(
+                        "px-2.5 py-1 rounded-full text-[11px] font-semibold border",
+                        statusStyle[selectedEvidence.custodyStatus],
+                      )}>
+                        {selectedEvidence.custodyStatus}
+                      </span>
+                    </div>
                   </div>
-                  <span className={cn(
-                    "px-2.5 py-1 rounded-full text-[11px] font-semibold border",
-                    statusStyle[selectedEvidence.custodyStatus],
-                  )}>
-                    {selectedEvidence.custodyStatus}
-                  </span>
-                </div>
-                <ChainTimeline records={custodyRecords} />
+                  {showAddForm && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="mb-4 p-4 rounded-xl bg-white/[0.03] border border-white/10 space-y-3"
+                    >
+                      <input
+                        type="text"
+                        placeholder="Person name"
+                        value={formPerson}
+                        onChange={(e) => setFormPerson(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10
+                          text-gray-200 placeholder-gray-600 focus:outline-none focus:border-cyan-500/50"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Action (e.g. Transferred to Lab)"
+                        value={formAction}
+                        onChange={(e) => setFormAction(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10
+                          text-gray-200 placeholder-gray-600 focus:outline-none focus:border-cyan-500/50"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Location"
+                        value={formLocation}
+                        onChange={(e) => setFormLocation(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10
+                          text-gray-200 placeholder-gray-600 focus:outline-none focus:border-cyan-500/50"
+                      />
+                      <select
+                        value={formRole}
+                        onChange={(e) => setFormRole(e.target.value as Role)}
+                        className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10
+                          text-gray-200 focus:outline-none focus:border-cyan-500/50"
+                      >
+                        <option value="Investigator">Investigator</option>
+                        <option value="Forensic Analyst">Forensic Analyst</option>
+                        <option value="Medical Officer">Medical Officer</option>
+                        <option value="Admin">Admin</option>
+                      </select>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setShowAddForm(false)}
+                          className="flex-1 px-3 py-2 rounded-lg text-xs font-medium border border-white/10
+                            text-gray-400 hover:bg-white/5 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleAddRecord}
+                          disabled={!formPerson.trim() || !formAction.trim() || !formLocation.trim()}
+                          className="flex-1 px-3 py-2 rounded-lg text-xs font-medium
+                            bg-cyan-500/20 text-cyan-400 border border-cyan-500/30
+                            hover:bg-cyan-500/30 transition-colors
+                            disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Save Record
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                  <ChainTimeline records={custodyRecords} />
               </motion.div>
 
               <motion.div

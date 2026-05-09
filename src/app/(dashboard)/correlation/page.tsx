@@ -13,10 +13,7 @@ import {
   Sparkles, LayoutGrid, GitBranch, Circle, X, Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  mockCorrelationNodes as rawNodes,
-  mockCorrelationEdges as rawEdges,
-} from "@/lib/mock-data";
+import { useData } from "@/lib/store";
 import type { CorrelationNode, CorrelationEdge } from "@/types";
 
 /* ------------------------------------------------------------------ */
@@ -224,18 +221,20 @@ function SuspectLinkCard({
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 export default function CorrelationPage() {
-  /* ----- convert mock data to ReactFlow format ----- */
-  const initialNodes: Node[] = useMemo(() => rawNodes.map((n: CorrelationNode, i) => ({
+  const { correlationNodes, correlationEdges, addCorrelationEdge, deleteCorrelationEdge, updateCorrelationEdge, dispatch } = useData();
+
+  /* ----- convert store data to ReactFlow format ----- */
+  const initialNodes: Node[] = useMemo(() => correlationNodes.map((n: CorrelationNode, i) => ({
     id: n.id,
     type: "correlationNode",
     position: {
-      x: 100 + Math.sin((i / rawNodes.length) * Math.PI * 2) * 250,
-      y: 100 + Math.cos((i / rawNodes.length) * Math.PI * 2) * 200,
+      x: 100 + Math.sin((i / correlationNodes.length) * Math.PI * 2) * 250,
+      y: 100 + Math.cos((i / correlationNodes.length) * Math.PI * 2) * 200,
     },
     data: { label: n.label, ...n.data },
-  })), []);
+  })), [correlationNodes]);
 
-  const initialEdges: Edge[] = useMemo(() => rawEdges.map((e: CorrelationEdge) => ({
+  const initialEdges: Edge[] = useMemo(() => correlationEdges.map((e: CorrelationEdge) => ({
     id: e.id,
     source: e.source,
     target: e.target,
@@ -254,7 +253,7 @@ export default function CorrelationPage() {
       : e.confirmed
       ? { stroke: "#10B981" }
       : { stroke: "#F59E0B", strokeDasharray: "6 4" },
-  })), []);
+  })), [correlationEdges]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -313,8 +312,9 @@ export default function CorrelationPage() {
   /* ----- AI Suggest Links ----- */
   const handleAiSuggest = useCallback(() => {
     setShowAiSuggestions(true);
+    const edgeId1 = `ai-suggested-${Date.now()}`;
     const aiEdge: Edge = {
-      id: `ai-suggested-${Date.now()}`,
+      id: edgeId1,
       source: "S-001",
       target: "V-001",
       type: "correlationEdge",
@@ -324,9 +324,11 @@ export default function CorrelationPage() {
       animated: true,
     };
     setEdges((eds) => [...eds, aiEdge]);
+    dispatch({ type: "ADD_CORRELATION_EDGE", payload: { id: edgeId1, source: "S-001", target: "V-001", label: "AI-suspected contact", confirmed: false, suspicious: true, confidence: 67 } });
 
+    const edgeId2 = `ai-suggested-${Date.now() + 1}`;
     const aiEdge2: Edge = {
-      id: `ai-suggested-${Date.now() + 1}`,
+      id: edgeId2,
       source: "D-001",
       target: "D-002",
       type: "correlationEdge",
@@ -336,7 +338,8 @@ export default function CorrelationPage() {
       animated: true,
     };
     setEdges((eds) => [...eds, aiEdge2]);
-  }, [setEdges]);
+    dispatch({ type: "ADD_CORRELATION_EDGE", payload: { id: edgeId2, source: "D-001", target: "D-002", label: "Possible connection", confirmed: false, suspicious: false, confidence: 54 } });
+  }, [setEdges, dispatch]);
 
   const handleAcceptEdge = useCallback((edgeId: string) => {
     setEdges((eds) =>
@@ -346,11 +349,13 @@ export default function CorrelationPage() {
           : e,
       ),
     );
-  }, [setEdges]);
+    updateCorrelationEdge(edgeId, { confirmed: true, suspicious: false });
+  }, [setEdges, updateCorrelationEdge]);
 
   const handleDismissEdge = useCallback((edgeId: string) => {
     setEdges((eds) => eds.filter((e) => e.id !== edgeId));
-  }, [setEdges]);
+    deleteCorrelationEdge(edgeId);
+  }, [setEdges, deleteCorrelationEdge]);
 
   return (
     <div className="relative h-[calc(100vh-100px)] animate-grid-bg -m-6">

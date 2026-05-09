@@ -12,9 +12,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
 import { cn, formatTime, timeAgo, priorityColor, riskColor } from "@/lib/utils";
-import {
-  mockCases, mockSensors, mockTimelineEvents, mockAnomalies, mockNotifications, mockEvidence,
-} from "@/lib/mock-data";
+import { useData } from "@/lib/store";
 import { getSocket } from "@/lib/socket";
 import type { SensorDevice, Notification, SensorReading } from "@/types";
 
@@ -161,8 +159,7 @@ function LiveIndicator() {
 /* ------------------------------------------------------------------ */
 export default function DashboardPage() {
   /* ----- state ----- */
-  const [sensors, setSensors] = useState<SensorDevice[]>(mockSensors.slice(0, 4));
-  const [alerts, setAlerts] = useState<Notification[]>(mockNotifications.filter((n) => !n.read));
+  const { cases, evidence, timelineEvents, sensors, anomalies, notifications, updateSensor, addNotification } = useData();
   const [toasts, setToasts] = useState<Notification[]>([]);
   const [riskScore, setRiskScore] = useState(82);
   const [riskChange, setRiskChange] = useState(1);
@@ -192,7 +189,7 @@ export default function DashboardPage() {
   });
 
   /* ----- evidence type pie data ----- */
-  const evidenceTypeCount = mockEvidence.reduce<Record<string, number>>((acc, e) => {
+  const evidenceTypeCount = evidence.reduce<Record<string, number>>((acc, e) => {
     acc[e.type] = (acc[e.type] || 0) + 1;
     return acc;
   }, {});
@@ -200,10 +197,10 @@ export default function DashboardPage() {
   const PIE_COLORS = ["#00F5FF", "#3B82F6", "#F59E0B", "#EF4444", "#10B981", "#8B5CF6"];
 
   /* ----- timeline preview (last 5) ----- */
-  const timelinePreview = mockTimelineEvents.slice(0, 5);
+  const timelinePreview = timelineEvents.slice(0, 5);
 
   /* ----- anomaly count ----- */
-  const anomalyCount = mockAnomalies.length;
+  const anomalyCount = anomalies.length;
 
   /* ----- timeline type icons ----- */
   const timelineIcons: Record<string, React.ElementType> = {
@@ -226,28 +223,16 @@ export default function DashboardPage() {
 
     const onSensorUpdate = (data: unknown) => {
       const reading = data as SensorReading;
-      setSensors((prev) =>
-        prev.map((s) => {
-          switch (s.type) {
-            case "DHT22":
-              if (s.name.includes("Temp")) return { ...s, value: parseFloat(reading.temperature.toFixed(1)), lastUpdated: reading.timestamp };
-              if (s.name.includes("Hum")) return { ...s, value: Math.round(reading.humidity), lastUpdated: reading.timestamp };
-              return s;
-            case "MQ-135":
-              return { ...s, value: Math.round(reading.aqi), lastUpdated: reading.timestamp };
-            case "PIR":
-              return { ...s, value: reading.motion ? "DETECTED" : "CLEAR", lastUpdated: reading.timestamp };
-            default:
-              return s;
-          }
-        }),
-      );
+      updateSensor("S-001", { value: parseFloat(reading.temperature.toFixed(1)), lastUpdated: reading.timestamp });
+      updateSensor("S-002", { value: Math.round(reading.humidity), lastUpdated: reading.timestamp });
+      updateSensor("S-003", { value: Math.round(reading.aqi), lastUpdated: reading.timestamp });
+      updateSensor("S-004", { value: reading.motion ? "DETECTED" : "CLEAR", lastUpdated: reading.timestamp });
     };
 
     const onAlert = (data: unknown) => {
       const alert = data as Notification;
       setToasts((prev) => [...prev.slice(-2), alert]);
-      setAlerts((prev) => [alert, ...prev].slice(0, 20));
+      addNotification({ type: "alert", severity: alert.severity, title: alert.title, description: alert.description, timestamp: alert.timestamp, read: false });
       setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== alert.id)), 5000);
     };
 
@@ -269,9 +254,9 @@ export default function DashboardPage() {
   }, []);
 
   /* ----- counts ----- */
-  const totalCases = mockCases.length;
-  const highRiskCases = mockCases.filter((c) => c.riskScore >= 50).length;
-  const activeAlerts = alerts.filter((a) => !a.read).length;
+  const totalCases = cases.length;
+  const highRiskCases = cases.filter((c) => c.priority === "Critical" || c.riskScore >= 70).length;
+  const activeAlerts = notifications.filter((n) => !n.read).length;
   const onlineSensors = sensors.filter((s) => s.status === "Online").length;
 
   const containerVariants = {
@@ -446,7 +431,7 @@ export default function DashboardPage() {
               <Radio className="w-4 h-4 text-green-400" />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              {sensors.map((s) => (
+              {sensors.slice(0, 4).map((s) => (
                 <SensorCard key={s.id} sensor={s} />
               ))}
             </div>
@@ -463,7 +448,7 @@ export default function DashboardPage() {
               <AlertTriangle className="w-4 h-4 text-amber-400" />
             </div>
             <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
-              {alerts.slice(0, 10).map((alert) => (
+              {notifications.slice(0, 10).map((alert) => (
                 <motion.div
                   key={alert.id}
                   initial={{ opacity: 0 }}
@@ -492,7 +477,7 @@ export default function DashboardPage() {
                   </div>
                 </motion.div>
               ))}
-              {alerts.length === 0 && (
+              {notifications.length === 0 && (
                 <p className="text-sm text-gray-500 text-center py-4">No alerts</p>
               )}
             </div>
@@ -514,8 +499,8 @@ export default function DashboardPage() {
               <CountUp target={anomalyCount} />
             </motion.p>
             <p className="text-xs text-gray-400 mt-2">
-              {mockAnomalies.filter((a) => a.severity === "Critical").length} Critical &middot;{" "}
-              {mockAnomalies.filter((a) => a.severity === "High").length} High
+              {anomalies.filter((a) => a.severity === "Critical").length} Critical &middot;{" "}
+              {anomalies.filter((a) => a.severity === "High").length} High
             </p>
           </motion.div>
         </div>
@@ -546,7 +531,7 @@ export default function DashboardPage() {
               </tr>
             </thead>
             <tbody>
-              {mockCases.filter((c) => c.status !== "Closed" && c.status !== "Archived").map((c) => (
+              {cases.filter((c) => c.status !== "Closed" && c.status !== "Archived").map((c) => (
                 <motion.tr
                   key={c.id}
                   initial={{ opacity: 0 }}

@@ -13,7 +13,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { cn } from "@/lib/utils";
-import { mockTODResult } from "@/lib/mock-data";
+import { generateTOD } from "@/lib/dynamic-data";
 import type { TODResult, RigorStage, LivorStage } from "@/types";
 
 const RIGOR_STAGES: RigorStage[] = ["None", "Onset", "Full", "Passing", "Absent"];
@@ -215,12 +215,12 @@ export default function TODPage() {
   const onSubmit = useCallback(() => {
     setCalculating(true);
     setTimeout(() => {
-      const data = mockTODResult();
+      const data = generateTOD(bodyTemp, ambientTemp, humidity, rigorStage, livorStage);
       setResult(data);
       setCalculating(false);
       setCalculated(true);
     }, 2000);
-  }, []);
+  }, [bodyTemp, ambientTemp, humidity, rigorStage, livorStage]);
 
   const chartData = useMemo(() => {
     if (!result) return [];

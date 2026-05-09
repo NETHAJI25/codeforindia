@@ -23,7 +23,8 @@ import {
   Shield,
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
-import type { CaseType, Priority } from "@/types";
+import type { CaseType, Priority, EvidenceType } from "@/types";
+import { useData } from "@/lib/store";
 
 const caseTypes: CaseType[] = ["Homicide", "Accident", "Missing Person", "Cybercrime", "Other"];
 const priorities: { value: Priority; label: string }[] = [
@@ -53,8 +54,19 @@ const caseSchema = z.object({
 
 type CaseFormData = z.output<typeof caseSchema>;
 
+function getEvidenceTypeFromFile(file: File): EvidenceType {
+  const ext = file.name.split(".").pop()?.toLowerCase() || "";
+  if (["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(ext)) return "Image";
+  if (["mp4", "mov", "avi", "mkv", "webm"].includes(ext)) return "Video";
+  if (["csv"].includes(ext)) return "CSV";
+  if (["kml", "gpx", "kmz"].includes(ext)) return "GPS";
+  if (["docx", "doc"].includes(ext)) return "DOCX";
+  return "PDF";
+}
+
 export default function CreateCasePage() {
   const router = useRouter();
+  const { addCase, addEvidence } = useData();
   const [files, setFiles] = useState<File[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -100,17 +112,50 @@ export default function CreateCasePage() {
     setFiles((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  const onSubmit = async (_data: CaseFormData) => {
+  const createCaseAndEvidence = (data: CaseFormData) => {
+    addCase({
+      title: data.title,
+      victim: data.victimName,
+      victimAge: data.victimAge ? parseInt(data.victimAge) : undefined,
+      victimGender: data.victimGender,
+      officer: data.assignedOfficer,
+      analyst: data.forensicAnalyst,
+      medicalOfficer: data.medicalOfficer,
+      type: data.type,
+      priority: data.priority,
+      riskScore: 0,
+      status: "Active",
+      location: data.location,
+      evidenceCount: files.length,
+      anomalies: 0,
+      notes: data.notes,
+    });
+
+    for (const file of files) {
+      addEvidence({
+        caseId: data.caseId,
+        name: file.name,
+        type: getEvidenceTypeFromFile(file),
+        size: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
+        tags: [],
+        custodyStatus: "Secured",
+      });
+    }
+  };
+
+  const onSubmit = async (data: CaseFormData) => {
     setSaving(true);
     await new Promise((r) => setTimeout(r, 1200));
+    createCaseAndEvidence(data);
     setSaving(false);
     setShowSuccess(true);
     setTimeout(() => router.push("/cases"), 2000);
   };
 
-  const onSaveDraft = async (_data: CaseFormData) => {
+  const onSaveDraft = async (data: CaseFormData) => {
     setSaving(true);
     await new Promise((r) => setTimeout(r, 600));
+    createCaseAndEvidence(data);
     setSaving(false);
     setShowSuccess(true);
     setTimeout(() => router.push("/cases"), 2000);
@@ -460,5 +505,3 @@ export default function CreateCasePage() {
     </div>
   );
 }
-
-

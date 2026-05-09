@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -19,7 +20,7 @@ import {
 } from "lucide-react";
 import { cn, formatDate, riskColor, riskBgColor, timeAgo } from "@/lib/utils";
 import type { Case, Priority, Status, CaseType } from "@/types";
-import { mockCases } from "@/lib/mock-data";
+import { useData } from "@/lib/store";
 
 const priorities: Priority[] = ["Low", "Medium", "High", "Critical"];
 const statuses: Status[] = ["Active", "Pending", "Closed", "Archived"];
@@ -31,8 +32,6 @@ const sortOptions = [
   { value: "risk", label: "Risk Score" },
 ] as const;
 
-const officers = Array.from(new Set(mockCases.map((c) => c.officer)));
-
 const stagger = {
   animate: { transition: { staggerChildren: 0.05 } },
 };
@@ -43,6 +42,8 @@ const fadeUp = {
 };
 
 export default function CasesPage() {
+  const router = useRouter();
+  const { cases, deleteCase, updateCase } = useData();
   const [search, setSearch] = useState("");
   const [priority, setPriority] = useState<Priority | "">("");
   const [status, setStatus] = useState<Status | "">("");
@@ -51,8 +52,10 @@ export default function CasesPage() {
   const [sort, setSort] = useState<string>("date-desc");
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
+  const officers = useMemo(() => Array.from(new Set(cases.map((c) => c.officer))), [cases]);
+
   const filtered = useMemo(() => {
-    let list = [...mockCases];
+    let list = [...cases];
 
     if (search) {
       const q = search.toLowerCase();
@@ -87,7 +90,20 @@ export default function CasesPage() {
     });
 
     return list;
-  }, [search, priority, status, caseType, officer, sort]);
+  }, [search, priority, status, caseType, officer, sort, cases]);
+
+  const handleEdit = (c: Case) => {
+    const newTitle = prompt("Edit case title:", c.title);
+    if (newTitle && newTitle !== c.title) {
+      updateCase(c.id, { title: newTitle });
+    }
+  };
+
+  const handleDelete = (id: string) => {
+    if (confirm("Are you sure you want to archive this case?")) {
+      deleteCase(id);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -268,15 +284,24 @@ export default function CasesPage() {
                 animate={{ opacity: 1 }}
                 className="absolute inset-0 rounded-xl bg-[#0B1020]/90 backdrop-blur-sm flex items-center justify-center gap-3"
               >
-                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/30 text-xs font-medium transition-all">
+                <button
+                  onClick={() => router.push(`/cases/${c.id}`)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/30 text-xs font-medium transition-all"
+                >
                   <Eye className="w-3.5 h-3.5" />
                   View
                 </button>
-                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/20 border border-blue-500/40 text-blue-400 hover:bg-blue-500/30 text-xs font-medium transition-all">
+                <button
+                  onClick={() => handleEdit(c)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/20 border border-blue-500/40 text-blue-400 hover:bg-blue-500/30 text-xs font-medium transition-all"
+                >
                   <Edit3 className="w-3.5 h-3.5" />
                   Edit
                 </button>
-                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30 text-xs font-medium transition-all">
+                <button
+                  onClick={() => handleDelete(c.id)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30 text-xs font-medium transition-all"
+                >
                   <Archive className="w-3.5 h-3.5" />
                   Archive
                 </button>

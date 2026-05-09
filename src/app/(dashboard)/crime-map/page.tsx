@@ -8,7 +8,7 @@ import {
   ChevronDown, ChevronUp, Clock, Layers, Thermometer,
 } from "lucide-react";
 import { cn, formatTime, timeAgo } from "@/lib/utils";
-import { mockTimelineEvents } from "@/lib/mock-data";
+import { useData } from "@/lib/store";
 import type { TimelineEvent } from "@/types";
 
 const MapContent = dynamic(() => import("./MapContent"), { ssr: false });
@@ -58,6 +58,7 @@ function EventItem({ event, onSelect, isSelected }: { event: TimelineEvent; onSe
 }
 
 export default function CrimeMapPage() {
+  const { timelineEvents } = useData();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState<TimelineEvent | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
@@ -65,7 +66,7 @@ export default function CrimeMapPage() {
   const [dateRange, setDateRange] = useState<[number, number]>([0, 100]);
 
   const eventsWithLocation = useMemo(() =>
-    mockTimelineEvents.filter((e) => e.location), []);
+    timelineEvents.filter((e) => e.location), [timelineEvents]);
 
   const gpsEvents = useMemo(() =>
     eventsWithLocation.filter((e) => e.type === "GPS").sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()), [eventsWithLocation]);

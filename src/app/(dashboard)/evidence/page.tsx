@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload,
@@ -24,7 +25,7 @@ import {
 } from "lucide-react";
 import { cn, formatDate, timeAgo } from "@/lib/utils";
 import type { EvidenceItem, EvidenceType, CustodyStatus } from "@/types";
-import { mockEvidence, mockCases } from "@/lib/mock-data";
+import { useData } from "@/lib/store";
 
 const evidenceTypes: EvidenceType[] = ["PDF", "DOCX", "Image", "Video", "CSV", "GPS"];
 const custodyStatuses: CustodyStatus[] = ["Secured", "In Lab", "In Transit", "Compromised"];
@@ -36,10 +37,6 @@ const supportedTypes = [
   { label: "CSV", icon: FileSpreadsheet },
   { label: "GPS/KML", icon: MapPin },
 ];
-
-const allTags = Array.from(new Set(mockEvidence.flatMap((e) => e.tags)));
-const allClassifications = Array.from(new Set(mockEvidence.map((e) => e.aiClassification).filter(Boolean))) as string[];
-const caseOptions = mockCases.map((c) => ({ id: c.id, title: c.title }));
 
 const typeIconMap: Record<EvidenceType, typeof FileText> = {
   PDF: FileText,
@@ -66,7 +63,19 @@ const fadeUp = {
   animate: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" as const } },
 };
 
+function getEvidenceTypeFromFile(file: File): EvidenceType {
+  const ext = file.name.split(".").pop()?.toLowerCase() || "";
+  if (["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(ext)) return "Image";
+  if (["mp4", "mov", "avi", "mkv", "webm"].includes(ext)) return "Video";
+  if (["csv"].includes(ext)) return "CSV";
+  if (["kml", "gpx", "kmz"].includes(ext)) return "GPS";
+  if (["docx", "doc"].includes(ext)) return "DOCX";
+  return "PDF";
+}
+
 export default function EvidencePage() {
+  const router = useRouter();
+  const { evidence, cases, deleteEvidence, addEvidence } = useData();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<EvidenceType | "">("");
   const [caseFilter, setCaseFilter] = useState("");
@@ -76,8 +85,18 @@ export default function EvidencePage() {
   const [uploadQueue, setUploadQueue] = useState<File[]>([]);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
+  const allTags = useMemo(() => Array.from(new Set(evidence.flatMap((e) => e.tags))), [evidence]);
+  const allClassifications = useMemo(
+    () => Array.from(new Set(evidence.map((e) => e.aiClassification).filter(Boolean))) as string[],
+    [evidence]
+  );
+  const caseOptions = useMemo(
+    () => cases.map((c) => ({ id: c.id, title: c.title })),
+    [cases]
+  );
+
   const filtered = useMemo(() => {
-    let list = [...mockEvidence];
+    let list = [...evidence];
 
     if (search) {
       const q = search.toLowerCase();
@@ -95,7 +114,7 @@ export default function EvidencePage() {
     if (classFilter) list = list.filter((e) => e.aiClassification === classFilter);
 
     return list;
-  }, [search, typeFilter, caseFilter, tagFilter, classFilter]);
+  }, [search, typeFilter, caseFilter, tagFilter, classFilter, evidence]);
 
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -120,6 +139,29 @@ export default function EvidencePage() {
   const clearQueue = useCallback(() => {
     setUploadQueue([]);
   }, []);
+
+  const handleUpload = () => {
+    if (uploadQueue.length === 0) return;
+    const caseId = prompt("Enter Case ID for these files:", cases[0]?.id || "");
+    if (!caseId) return;
+    for (const file of uploadQueue) {
+      addEvidence({
+        caseId,
+        name: file.name,
+        type: getEvidenceTypeFromFile(file),
+        size: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
+        tags: [],
+        custodyStatus: "Secured",
+      });
+    }
+    setUploadQueue([]);
+  };
+
+  const handleDelete = (id: string) => {
+    if (confirm("Are you sure you want to delete this evidence?")) {
+      deleteEvidence(id);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -222,7 +264,10 @@ export default function EvidencePage() {
                   </motion.div>
                 ))}
               </div>
-              <button className="mt-3 w-full py-2 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/30 text-sm font-medium transition-all">
+              <button
+                onClick={handleUpload}
+                className="mt-3 w-full py-2 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/30 text-sm font-medium transition-all"
+              >
                 Upload {uploadQueue.length} file{uploadQueue.length !== 1 ? "s" : ""}
               </button>
             </motion.div>
@@ -393,11 +438,17 @@ export default function EvidencePage() {
                       <Download className="w-3.5 h-3.5" />
                       Download
                     </button>
-                    <button className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-400 hover:bg-purple-500/30 text-xs font-medium transition-all">
+                    <button
+                      onClick={() => router.push("/autopsy")}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-400 hover:bg-purple-500/30 text-xs font-medium transition-all"
+                    >
                       <BarChart3 className="w-3.5 h-3.5" />
                       Analyze
                     </button>
-                    <button className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30 text-xs font-medium transition-all">
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30 text-xs font-medium transition-all"
+                    >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </motion.div>

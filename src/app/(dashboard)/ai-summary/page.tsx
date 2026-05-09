@@ -8,7 +8,8 @@ import {
   Hash, MapPin, Calendar,
 } from "lucide-react";
 import { cn, formatDateTime, riskColor, riskBgColor, severityColor } from "@/lib/utils";
-import { mockCases, mockAISummary } from "@/lib/mock-data";
+import { useData } from "@/lib/store";
+import { generateSummary } from "@/lib/dynamic-data";
 import type { AISummary } from "@/types";
 
 function useTypewriter(text: string, speed = 25, start = false) {
@@ -60,7 +61,8 @@ const itemVariants = {
 };
 
 export default function AISummaryPage() {
-  const caseData = mockCases[0];
+  const { cases, evidence, anomalies, timelineEvents } = useData();
+  const caseData = cases[0];
   const [summary, setSummary] = useState<AISummary | null>(null);
   const [generating, setGenerating] = useState(false);
   const [phase, setPhase] = useState<"idle" | "analyzing" | "reveal">("idle");
@@ -69,11 +71,11 @@ export default function AISummaryPage() {
     setGenerating(true);
     setPhase("analyzing");
     setTimeout(() => {
-      setSummary(mockAISummary());
+      setSummary(generateSummary(caseData, anomalies, timelineEvents, evidence));
       setPhase("reveal");
       setTimeout(() => setGenerating(false), 500);
     }, 2500);
-  }, []);
+  }, [caseData, anomalies, timelineEvents, evidence]);
 
   return (
     <div className="relative min-h-screen p-4 md:p-6 animate-grid-bg">

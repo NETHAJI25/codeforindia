@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn, riskColor, riskBgColor } from "@/lib/utils";
 import { getSocket } from "@/lib/socket";
-import { mockCases, mockNotifications } from "@/lib/mock-data";
+import { useData } from "@/lib/store";
 import { Bell, ChevronDown, Circle, User } from "lucide-react";
 
 const breadcrumbLabels: Record<string, string> = {
@@ -27,11 +27,12 @@ const breadcrumbLabels: Record<string, string> = {
 
 export default function Topbar() {
   const pathname = usePathname();
+  const { cases, notifications } = useData();
   const [connected, setConnected] = useState(false);
   const [caseSelectorOpen, setCaseSelectorOpen] = useState(false);
-  const [selectedCaseId, setSelectedCaseId] = useState(mockCases[0]?.id ?? "");
-  const unreadCount = mockNotifications.filter((n) => !n.read).length;
-  const selectedCase = mockCases.find((c) => c.id === selectedCaseId);
+  const [selectedCaseId, setSelectedCaseId] = useState(cases[0]?.id ?? "");
+  const unreadCount = notifications.filter((n) => !n.read).length;
+  const selectedCase = cases.find((c) => c.id === selectedCaseId);
 
   const segments = pathname.split("/").filter(Boolean);
   const label = breadcrumbLabels[segments[0] ?? ""] ?? "Dashboard";
@@ -75,7 +76,7 @@ export default function Topbar() {
           </button>
           {caseSelectorOpen && (
             <div className="absolute right-0 top-full mt-2 w-64 rounded-xl bg-[#111827] border border-white/10 shadow-2xl overflow-hidden z-50">
-              {mockCases.map((c) => (
+              {cases.map((c) => (
                 <button
                   key={c.id}
                   onClick={() => { setSelectedCaseId(c.id); setCaseSelectorOpen(false); }}

@@ -10,7 +10,8 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { cn, formatTime, timeAgo } from "@/lib/utils";
-import { mockSensors, generateMockSensorReading } from "@/lib/mock-data";
+import { generateMockSensorReading } from "@/lib/mock-data";
+import { useData } from "@/lib/store";
 import { getSocket } from "@/lib/socket";
 import type { SensorDevice, SensorReading } from "@/types";
 
@@ -296,88 +297,78 @@ function LiveIndicator() {
 }
 
 export default function SensorsPage() {
-  const [sensors, setSensors] = useState<SensorDevice[]>(() =>
-    mockSensors.map((s) => ({
-      ...s,
-      history: [...s.history],
-    })),
-  );
+  const { sensors, updateSensor } = useData();
+  const sensorsRef = useRef(sensors);
+  useEffect(() => { sensorsRef.current = sensors; }, [sensors]);
   const [lastReading, setLastReading] = useState<SensorReading | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
   const [renderTick, setRenderTick] = useState(0);
   const initialized = useRef(false);
 
-  const pushHistory = useCallback((sensors: SensorDevice[], id: string, value: number | string | boolean) => {
-    return sensors.map((s) => {
-      if (s.id !== id) return s;
-      return {
-        ...s,
-        value,
-        lastUpdated: new Date().toISOString(),
-        history: [...s.history.slice(-59), { value: typeof value === "number" ? value : (value === true ? 1 : 0), timestamp: new Date().toISOString() }],
-      };
-    });
-  }, []);
-
   const handleSensorUpdate = useCallback((reading: SensorReading) => {
     setLastReading(reading);
-    setSensors((prev) => {
-      let updated = [...prev];
+    const currentSensors = sensorsRef.current;
 
-      const tempSensor = updated.find((s) => s.name === "Temperature Sensor");
-      if (tempSensor) {
-        const v = parseFloat(reading.temperature.toFixed(1));
-        updated = pushHistory(updated, tempSensor.id, v);
+    const tempSensor = currentSensors.find((s) => s.name === "Temperature Sensor");
+    if (tempSensor) {
+      const v = parseFloat(reading.temperature.toFixed(1));
+      updateSensor(tempSensor.id, {
+        value: v,
+        lastUpdated: new Date().toISOString(),
+        history: [...tempSensor.history.slice(-59), { value: v, timestamp: new Date().toISOString() }],
+      });
+    }
+
+    const humSensor = currentSensors.find((s) => s.name === "Humidity Sensor");
+    if (humSensor) {
+      const v = Math.round(reading.humidity);
+      updateSensor(humSensor.id, {
+        value: v,
+        lastUpdated: new Date().toISOString(),
+        history: [...humSensor.history.slice(-59), { value: v, timestamp: new Date().toISOString() }],
+      });
+    }
+
+    const aqiSensor = currentSensors.find((s) => s.name === "Air Quality Monitor");
+    if (aqiSensor) {
+      const v = Math.round(reading.aqi);
+      const newStatus: SensorDevice["status"] = v > 200 ? "Alert" : v > 150 ? "Threshold" : "Online";
+      updateSensor(aqiSensor.id, {
+        value: v,
+        status: newStatus,
+        lastUpdated: reading.timestamp,
+        history: [...aqiSensor.history.slice(-59), { value: v, timestamp: reading.timestamp }],
+      });
+    }
+
+    const motionSensor = currentSensors.find((s) => s.name === "Motion Detector");
+    if (motionSensor) {
+      const v = reading.motion ? "DETECTED" : "CLEAR";
+      const newStatus: SensorDevice["status"] = reading.motion ? "Alert" : "Online";
+      if (reading.motion) {
+        setNotification("Motion: DETECTED");
+        setTimeout(() => setNotification(null), 4000);
       }
+      updateSensor(motionSensor.id, { value: v, status: newStatus, lastUpdated: reading.timestamp });
+    }
 
-      const humSensor = updated.find((s) => s.name === "Humidity Sensor");
-      if (humSensor) {
-        const v = Math.round(reading.humidity);
-        updated = pushHistory(updated, humSensor.id, v);
-      }
+    const vibSensor = currentSensors.find((s) => s.name === "Vibration Sensor");
+    if (vibSensor) {
+      updateSensor(vibSensor.id, {
+        value: reading.vibration,
+        lastUpdated: reading.timestamp,
+        history: [...vibSensor.history.slice(-59), { value: typeof reading.vibration === "number" ? reading.vibration : 0, timestamp: reading.timestamp }],
+      });
+    }
 
-      const aqiSensor = updated.find((s) => s.name === "Air Quality Monitor");
-      if (aqiSensor) {
-        const v = Math.round(reading.aqi);
-        const newStatus: SensorDevice["status"] = v > 200 ? "Alert" : v > 150 ? "Threshold" : "Online";
-        updated = updated.map((s) =>
-          s.id === aqiSensor.id ? { ...s, value: v, status: newStatus, lastUpdated: reading.timestamp } : s,
-        );
-      }
+    const gpsSensor = currentSensors.find((s) => s.name === "GPS Tracker");
+    if (gpsSensor) {
+      const gpsStr = `${reading.gps.lat.toFixed(4)}°N, ${reading.gps.lng.toFixed(4)}°E`;
+      updateSensor(gpsSensor.id, { value: gpsStr, lastUpdated: reading.timestamp });
+    }
 
-      const motionSensor = updated.find((s) => s.name === "Motion Detector");
-      if (motionSensor) {
-        const v = reading.motion ? "DETECTED" : "CLEAR";
-        const newStatus: SensorDevice["status"] = reading.motion ? "Alert" : "Online";
-        if (reading.motion) {
-          setNotification("Motion: DETECTED");
-          setTimeout(() => setNotification(null), 4000);
-        }
-        updated = updated.map((s) =>
-          s.id === motionSensor.id ? { ...s, value: v, status: newStatus, lastUpdated: reading.timestamp } : s,
-        );
-      }
-
-      const vibSensor = updated.find((s) => s.name === "Vibration Sensor");
-      if (vibSensor) {
-        updated = pushHistory(updated, vibSensor.id, reading.vibration);
-        updated = updated.map((s) =>
-          s.id === vibSensor.id ? { ...s, value: reading.vibration, lastUpdated: reading.timestamp } : s,
-        );
-      }
-
-      const gpsSensor = updated.find((s) => s.name === "GPS Tracker");
-      if (gpsSensor) {
-        const gpsStr = `${reading.gps.lat.toFixed(4)}°N, ${reading.gps.lng.toFixed(4)}°E`;
-        updated = updated.map((s) =>
-          s.id === gpsSensor.id ? { ...s, value: gpsStr, lastUpdated: reading.timestamp } : s,
-        );
-      }
-
-      return updated;
-    });
     setRenderTick((t) => t + 1);
-  }, [pushHistory]);
+  }, [updateSensor]);
 
   const triggerMotion = useCallback(() => {
     const fakeReading: SensorReading = {

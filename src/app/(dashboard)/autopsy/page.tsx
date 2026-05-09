@@ -7,7 +7,8 @@ import {
   Search, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { mockAIAnalysisResult } from "@/lib/mock-data";
+import { useData } from "@/lib/store";
+import { generateAIAnalysis } from "@/lib/dynamic-data";
 import type { AIAnalysisResult } from "@/types";
 
 const FORENSIC_TERMS = [
@@ -190,8 +191,10 @@ export default function AutopsyPage() {
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [rawOpen, setRawOpen] = useState(false);
+  const [result, setResult] = useState<AIAnalysisResult | null>(null);
+  const [flagged, setFlagged] = useState(false);
 
-  const result = useMemo(() => mockAIAnalysisResult(), []);
+  const { cases, evidence, addTimelineEvent } = useData();
 
   const startAnalysis = useCallback(() => {
     setScanning(true);
@@ -202,6 +205,8 @@ export default function AutopsyPage() {
         if (next >= 100) {
           clearInterval(interval);
           setTimeout(() => {
+            const analysis = generateAIAnalysis(evidence, cases[0]);
+            setResult(analysis);
             setScanning(false);
             setAnalyzed(true);
           }, 300);
@@ -210,7 +215,7 @@ export default function AutopsyPage() {
         return next;
       });
     }, 200);
-  }, []);
+  }, [evidence, cases]);
 
   const reportContent = useMemo(() => {
     const text = MOCK_REPORT_PAGES[page] ?? "";
@@ -340,6 +345,7 @@ export default function AutopsyPage() {
                 </span>
               </div>
 
+              {result && (
               <div className="space-y-3">
                 <InsightCard title="Cause of Death" severity="critical" icon={AlertTriangle}>
                   <div className="flex items-center justify-between">
@@ -384,20 +390,45 @@ export default function AutopsyPage() {
                   </ul>
                 </InsightCard>
               </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-3 pt-2">
-                <button className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/30 text-xs font-medium transition-all">
+                <button
+                  onClick={startAnalysis}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/30 text-xs font-medium transition-all"
+                >
                   <Microscope className="w-3.5 h-3.5" />
                   Re-analyze
                 </button>
-                <button className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-500/20 border border-blue-500/40 text-blue-400 hover:bg-blue-500/30 text-xs font-medium transition-all">
+                <button
+                  onClick={() => {
+                    if (!cases[0] || !result) return;
+                    addTimelineEvent({
+                      caseId: cases[0].id,
+                      timestamp: new Date().toISOString(),
+                      type: "Evidence Upload",
+                      title: "Autopsy Analysis Completed",
+                      description: `Cause: ${result.causeOfDeath} (${result.causeConfidence}% confidence)`,
+                      confidence: result.causeConfidence,
+                    });
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-500/20 border border-blue-500/40 text-blue-400 hover:bg-blue-500/30 text-xs font-medium transition-all"
+                >
                   <CheckCircle className="w-3.5 h-3.5" />
                   Add to Case Timeline
                 </button>
-                <button className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30 text-xs font-medium transition-all">
+                <button
+                  onClick={() => setFlagged((f) => !f)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-4 py-2 rounded-lg border text-xs font-medium transition-all",
+                    flagged
+                      ? "bg-red-500/30 border-red-500/60 text-red-300"
+                      : "bg-red-500/20 border-red-500/40 text-red-400 hover:bg-red-500/30",
+                  )}
+                >
                   <AlertTriangle className="w-3.5 h-3.5" />
-                  Flag for Review
+                  {flagged ? "Flagged for Review" : "Flag for Review"}
                 </button>
               </div>
 
@@ -419,7 +450,7 @@ export default function AutopsyPage() {
                       className="overflow-hidden"
                     >
                       <pre className="p-4 text-[10px] text-gray-500 font-mono whitespace-pre-wrap border-t border-cyan-500/10 max-h-48 overflow-y-auto">
-                        {JSON.stringify(result, null, 2)}
+                        {JSON.stringify(result!, null, 2)}
                       </pre>
                     </motion.div>
                   )}

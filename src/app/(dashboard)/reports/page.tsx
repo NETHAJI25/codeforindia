@@ -19,7 +19,8 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
-import { mockCases } from "@/lib/mock-data";
+import { useData } from "@/lib/store";
+import type { Case } from "@/types";
 
 interface ReportType {
   id: string;
@@ -89,12 +90,14 @@ function GeneratedPreview({
   reportType,
   caseId,
   watermark,
+  cases,
 }: {
   reportType: ReportType;
   caseId: string;
   watermark: string;
+  cases: Case[];
 }) {
-  const selectedCase = mockCases.find((c) => c.id === caseId);
+  const selectedCase = cases.find((c) => c.id === caseId);
   const ReportIcon = reportType.icon;
 
   return (
@@ -178,8 +181,9 @@ function GeneratedPreview({
 }
 
 export default function ReportsPage() {
+  const { cases, evidence, anomalies } = useData();
   const [selectedReport, setSelectedReport] = useState<string>("full-case");
-  const [selectedCase, setSelectedCase] = useState(mockCases[0]?.id ?? "");
+  const [selectedCase, setSelectedCase] = useState(cases[0]?.id ?? "");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [selectedSections, setSelectedSections] = useState<Set<string>>(
@@ -282,7 +286,7 @@ export default function ReportsPage() {
                   className="w-full px-3 py-2 rounded-lg bg-white/5 border border-cyan-500/20 text-gray-300 text-xs
                     focus:outline-none focus:border-cyan-500/50 cursor-pointer appearance-none"
                 >
-                  {mockCases.map((c) => (
+                  {cases.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.id} — {c.title}
                     </option>
@@ -409,6 +413,7 @@ export default function ReportsPage() {
                   reportType={report}
                   caseId={selectedCase}
                   watermark={watermark}
+                  cases={cases}
                 />
               ) : (
                 <PreviewPlaceholder />
