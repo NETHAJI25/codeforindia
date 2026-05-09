@@ -1,0 +1,13 @@
+socketio[sqlite]
+motor
+pymongo
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+spacy
+transformers
+torch
+scikit-learn
+opencv-python
+pydantic
+uvicorn
